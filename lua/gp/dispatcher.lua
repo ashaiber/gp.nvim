@@ -158,7 +158,17 @@ D.prepare_payload = function(messages, model, provider)
          temperature = math.max(0, math.min(2, model.temperature or 1)),
          top_p = math.max(0, math.min(1, model.top_p or 1)),
       }
+
       return payload
+   end
+
+   if provider == "anthropic" or provider == "litellm" then
+      if model.thinking then
+	     if model.thinking.type == "enabled" then
+		    output.temperature = 1
+		    output.top_p = nil
+		 end
+      end
    end
 
    if provider == "copilot" and model.model == "gpt-4o" then
@@ -174,7 +184,11 @@ D.prepare_payload = function(messages, model, provider)
       top_p = math.max(0, math.min(1, model.top_p or 1)),
    }
 
-   if provider == "openai" and model.model:sub(1, 2) == "o1" then
+   if provider == "openai" and model.model:sub(1, 1) == "o" then
+               -- o3 supports reasoning effort
+      if model.model:sub(1, 2) == "o3" then
+         output.reasoning_effort = model.reasoning_effort or "medium"
+      end
       for i = #messages, 1, -1 do
          if messages[i].role == "system" then
             table.remove(messages, i)
@@ -184,7 +198,6 @@ D.prepare_payload = function(messages, model, provider)
       output.max_tokens = nil
       output.temperature = nil
       output.top_p = nil
-      output.stream = false
    end
 
    return output
@@ -300,7 +313,7 @@ local query = function(buf, provider, payload, handler, on_exit, callback)
             end
             local raw_response = qt.raw_response
             local content = qt.response
-            if qt.provider == 'openai' and content == "" and raw_response:match('choices') and raw_response:match("content") then
+            if (qt.provider == 'openai' or qt.provider == 'litellm') and content == "" and raw_response:match('choices') and raw_response:match("content") then
                local response = vim.json.decode(raw_response)
                if response.choices and response.choices[1] and response.choices[1].message and response.choices[1].message.content then
                   content = response.choices[1].message.content
@@ -358,6 +371,14 @@ local query = function(buf, provider, payload, handler, on_exit, callback)
          "Authorization: Bearer " .. bearer,
       }
    elseif provider == "openai" then
+      headers = {
+         "-H",
+         "Authorization: Bearer " .. bearer,
+         -- backwards compatibility
+         "-H",
+         "api-key: " .. bearer,
+      }
+   elseif provider == "litellm" then
       headers = {
          "-H",
          "Authorization: Bearer " .. bearer,
