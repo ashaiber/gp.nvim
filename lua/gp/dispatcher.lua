@@ -158,17 +158,15 @@ D.prepare_payload = function(messages, model, provider)
          temperature = math.max(0, math.min(2, model.temperature or 1)),
          top_p = math.max(0, math.min(1, model.top_p or 1)),
       }
+      if model.thinking then
+         payload.thinking = model.thinking
+         if model.thinking.type == "enabled" then
+            payload.temperature = 1
+            payload.top_p = nil
+         end
+      end
 
       return payload
-   end
-
-   if provider == "anthropic" or provider == "litellm" then
-      if model.thinking then
-	     if model.thinking.type == "enabled" then
-		    output.temperature = 1
-		    output.top_p = nil
-		 end
-      end
    end
 
    if provider == "copilot" and model.model == "gpt-4o" then
@@ -183,6 +181,16 @@ D.prepare_payload = function(messages, model, provider)
       temperature = math.max(0, math.min(2, model.temperature or 1)),
       top_p = math.max(0, math.min(1, model.top_p or 1)),
    }
+
+   if provider == "litellm" then
+      if model.thinking then
+         output.thinking = model.thinking
+         if model.thinking.type == "enabled" then
+            output.temperature = 1
+            output.top_p = nil
+         end
+      end
+   end
 
    if provider == "openai" and model.model:sub(1, 1) == "o" then
                -- o3 supports reasoning effort
